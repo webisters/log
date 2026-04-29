@@ -1,0 +1,63 @@
+<?php
+/*
+ * This file is part of Webisters Log Library.
+ *
+ * (c) Hafiz Muhammad Moaz <thewebisters@gmail.com>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+namespace Tests\Log\Loggers;
+
+use Framework\Log\Loggers\MultiFileLogger;
+use Tests\Log\TestCase;
+
+final class MultiFileLoggerTest extends TestCase
+{
+    protected function setUp() : void
+    {
+        $destination = \sys_get_temp_dir() . '/logs';
+        if (!\is_dir($destination)) {
+            \mkdir($destination);
+        }
+        \chmod($destination, 0777);
+        $this->logger = new MultiFileLogger(destination: $destination);
+    }
+
+    public function testInvalidDestination() : void
+    {
+        $destination = \sys_get_temp_dir() . '/foo/bar';
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Invalid directory destination: ' . $destination);
+        new MultiFileLogger(destination: $destination);
+    }
+
+    public function testWriteFailure() : void
+    {
+        if (\getenv('GITLAB_CI')) {
+            $this->markTestIncomplete();
+        }
+        self::assertTrue($this->logger->logCritical('foo'));
+        $dir = \sys_get_temp_dir() . '/logs';
+        \chmod($dir, 0444);
+        /*$destination = $dir . '/' . \date('Y-m-d') . '.log';
+        $this->expectError();
+        $this->expectErrorMessage(
+            'error_log(' . $destination . '): Failed to open stream: Permission denied'
+        );*/
+        self::assertFalse(@$this->logger->logCritical('foo'));
+    }
+
+    public function testMessage() : void
+    {
+        $filename = \sys_get_temp_dir() . '/logs/' . \date('Y-m-d') . '.log';
+        if (\is_file($filename)) {
+            \unlink($filename);
+        }
+        $this->logger->logCritical('Foo');
+        $time = \date('H:i:s', $this->logger->getLastLog()?->time);
+        $contents = \file_get_contents($filename);
+        $contents = \substr($contents, 0, 8); // @phpstan-ignore-line
+        self::assertSame($contents, $time);
+    }
+}
