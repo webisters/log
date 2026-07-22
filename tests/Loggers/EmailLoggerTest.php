@@ -18,7 +18,16 @@ final class EmailLoggerTest extends TestCase
 {
     protected function setUp() : void
     {
-        $this->logger = new EmailLogger(destination: 'developer@localhost.localdomain');
+        // error_log() with message type 1 needs a working MTA, which CI runners
+        // do not have. Stub the delivery so the inherited Logger tests still
+        // exercise the log handling, and keep makeHeaders() in the path.
+        $this->logger = new class(destination: 'developer@localhost.localdomain') extends EmailLogger {
+            protected function write(Log $log) : bool
+            {
+                $this->makeHeaders($log);
+                return true;
+            }
+        };
     }
 
     public function testInvalidDestination() : void
